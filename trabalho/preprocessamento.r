@@ -19,22 +19,27 @@ rm(allProp)
 rm(txtEmenta)
 
 # Carrega uma lista de stopwrds pt-br e adiciona algumas que parecem ser bastante comuns nesse dataset
-sw = data_frame(data_stopwords_stopwordsiso$br)
+sw = data_stopwords_stopwordsiso$br
 # Posso usar essas stopwords personalizadas ou não. A adição delas pode alterar o resultado.
 meses = c('janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro')
-added_sw = data_frame(word = c('lei', 'nº', 'art', 'dá', 'no', 'para', 'dispõe', 
-                               'altera', 'aprova', 'providências', 'ato', 'institui', 
-                               'inciso', 'providencias', 'à', 'às', meses, 'trata', ''))
-names(sw)[1] = 'word'
+romanos = tolower(as.roman(1:100))
+
+added_sw = word = c('lei', 'nº', 'art', 'da', 'no', 'para', 'dispoe', 
+                               'altera', 'aprova', 'providencias', 'ato', 'institui', 
+                               'inciso', 'providencias', 'a', 'as', 'trata', '', romanos)
 sw = union(sw, added_sw)
 
 
 # Organiza od dados no formato tidy
 palavras = txtEmenta_df %>%
   unite(txtEmenta, c("txtEmenta", "txtExplicacaoEmenta"), sep = " ") %>%
-  unnest_tokens(word, txtEmenta) %>%
-  anti_join(sw) %>%
-  filter(!grepl('^\\d+|.*º.*|^[a-z]$', word))
+  unnest_tokens(word, txtEmenta)
+  
+palavras$word = iconv(palavras$word, to="ASCII//TRANSLIT")   
+  
+palavras = palavras %>%
+  anti_join(data_frame(word = sw)) %>%
+  filter(!grepl('^\\d+|.*º.*|.*\\..*|^[a-z]$', word))
 
 
 # download the list
@@ -63,7 +68,10 @@ pt_stem <- function(p) {
   p2
 }
 
-palavras[['word']] = pt_stem(palavras[['word']])
+palavras_stemizadas = palavras
+
+
+palavras_stemizadas[['word']] = pt_stem(palavras[['word']])
 
 ptstem(palavras[['word']], complete = F)
 
@@ -78,6 +86,11 @@ palavras_tf_idf1 = palavras %>%
   arrange(desc(tf_idf)) %>%
   filter(nome %in% c("PL 6383/2016", "PL 6384/2016", "PL 6385/2016", "PL 6386/2016", 
                      "PL 6388/2016", "PL 6387/2016"))
+
+palavras_tf_idf = palavras %>%
+  count(nome, word, sort = T) %>%
+  bind_tf_idf(word, nome, n) %>%
+  arrange(desc(tf_idf))
 
 palavras_tf_idf1 %>%
   arrange(desc(tf_idf)) %>%
