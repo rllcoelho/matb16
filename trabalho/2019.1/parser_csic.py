@@ -1,4 +1,6 @@
 import sys, pandas as pd
+import pickle, json
+from random import sample
 
 def parse_parameter(p):
     name, value = p.rstrip().split('=') if p.find('=') != -1 else (p, '')
@@ -56,10 +58,14 @@ def parse_request2(r):
     
     return {'method': method, 'path': path, 'par_names': par_names, 'words': words, 'version': version} 
 
-def saveincsv(r, f = sys.argv[1] + '.csv'):
-    with open(f, 'w') as csvfile:
-        writer = csv.DictWriter(csvfile)
-        writer.writeheader()
+def save(r, f = sys.argv[1] + '.dict', f_type='pickle'):
+    if f_type == 'pickle':
+        with open(f + 'pkl', 'wb') as fp:
+            pickle.dump(r, fp, protocol=pickle.HIGHEST_PROTOCOL)
+    elif f_type == 'json':
+        with open(f + 'json', 'w') as fp:
+            json.dump(r, fp)
+
 
 def possible_values(rs, rpart):
     s = set()
@@ -96,8 +102,11 @@ def make_table(rs):
     table['version'] = []
 
     locations = possible_values(rs, 'path')
+    print('Found all possible values for location')
     param_names = possible_values(rs, 'par_names')
+    print('Found all possible values for parameter_names')
     words_in_values = possible_values(rs, 'words')
+    print('Found all possible values for words in parameter values')
     
     for l in locations:
         locations_tb[l] = []
@@ -106,20 +115,32 @@ def make_table(rs):
     for w in words_in_values:
         words_tb[w] = []
     
+    c = 0
+    lenrs = len(rs)
     for r in rs:
-        table['method'] += r['method']
+        table['method'].append(r['method'])
+        table['version'].append(r['version'])
 
         fill_row(locations_tb, r, 'path')
         fill_row(param_names_tb, r, 'par_names')
         fill_row(words_tb, r, 'words')
+        c += 1
 
-        table.update(locations_tb)
-        table.update(param_names_tb)
-        table.update(words_tb)
-        
-        table['version'] += r['version']
+        sys.stdout.write("\r%i/%i" % (c, lenrs))
+        sys.stdout.flush()
+        #print(len(table))
 
-        return table
+    table.update(locations_tb)
+    print('Locations added to table')
+    table.update(param_names_tb)
+    print('Par names added to table')
+    table.update(words_tb)
+    print('Words added to table')
+
+    #lens = {len(rows) for col, rows in table.items()}
+    #print(lens)
+    
+    return table
            
 def main():
     emptylines, count = (0, 0)
@@ -141,10 +162,15 @@ def main():
                 elif newrequest:
                     requests.append(parse_request2(line)) # If it's the first line of a request, parse it.
                     newrequest = False
-   
-    print(len(requests))
-    df = pd.DataFrame(make_table(requests))
-    print(df.head())
+
+    requests_sample = sample(requests, 500)
+    table = make_table(requests_sample)
+    save(table)
+    print('pickle saved')
+    save(table, f_type = 'json')
+    print('json saved')
+    #df = pd.DataFrame(make_table(requests))
+    #print(df.head())
     # }}}
 
 main()
